@@ -95,7 +95,7 @@ jobs:
           retention-days: 1
 
 
- SONARQUBE CODE ANALYSIS
+ # 4. SONARQUBE CODE ANALYSIS
   sonarqube-scan:
     name: SonarQube Scan
     runs-on: ubuntu-latest
