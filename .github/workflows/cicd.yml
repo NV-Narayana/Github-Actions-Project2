@@ -122,7 +122,7 @@ jobs:
 
       - name: Debug secrets
         env:
-          T: ${{ secrets.SONAR_TOKEN }}
+          T: ${{ secrets.SONARQUBE_TOKEN }}
           U: ${{ secrets.SONAR_HOST_URL || vars.SONAR_HOST_URL }}
         run: |
           echo "token set: $([ -n "$T" ] && echo yes || echo no)"
@@ -130,7 +130,7 @@ jobs:
 
       - name: SonarQube Scan
         env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONARQUBE_TOKEN: ${{ secrets.SONARQUBE_TOKEN }}
           # Works whether SONAR_HOST_URL was saved under Secrets or Variables
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL || vars.SONAR_HOST_URL }}
         run: |
@@ -144,8 +144,8 @@ jobs:
             exit 1
           fi
 
-          if [ -z "$SONAR_TOKEN" ]; then
-            echo "ERROR: SONAR_TOKEN is empty. Add it under Settings > Secrets and variables > Actions > Secrets."
+          if [ -z "$SONARQUBE_TOKEN" ]; then
+            echo "ERROR: SONARQUBE_TOKEN is empty. Add it under Settings > Secrets and variables > Actions > Secrets."
             exit 1
           fi
 
@@ -166,7 +166,7 @@ jobs:
             org.sonarsource.scanner.maven:sonar-maven-plugin:5.9.0.7382:sonar \
             -Dsonar.projectKey=github-actions-devsecops \
             -Dsonar.host.url="$SONAR_HOST_URL" \
-            -Dsonar.token="$SONAR_TOKEN" \
+            -Dsonar.token="$SONARQUBE_TOKEN" \
             -Dsonar.qualitygate.wait=true
 
 
