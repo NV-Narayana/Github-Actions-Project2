@@ -120,6 +120,14 @@ jobs:
           name: maven-target
           path: target/
 
+      - name: Debug secrets
+        env:
+          T: ${{ secrets.SONAR_TOKEN }}
+          U: ${{ secrets.SONAR_HOST_URL || vars.SONAR_HOST_URL }}
+        run: |
+          echo "token set: $([ -n "$T" ] && echo yes || echo no)"
+          echo "url set: $([ -n "$U" ] && echo yes || echo no)"
+
       - name: SonarQube Scan
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
