@@ -6,7 +6,7 @@ on:
 
 jobs:
   compile:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 17
@@ -19,7 +19,7 @@ jobs:
       run: mvn --batch-mode compile
 
   security-check:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: compile
     steps:
     - uses: actions/checkout@v4
@@ -28,26 +28,21 @@ jobs:
 
     - name: Trivy Installation
       run: |
-        if ! command -v trivy >/dev/null 2>&1; then
-          sudo apt-get update -y
-          sudo apt-get install -y wget apt-transport-https gnupg lsb-release
-          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
-          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
-          sudo apt-get update -y
-          sudo apt-get install -y trivy
-        fi
+        sudo apt-get update -y
+        sudo apt-get install -y wget apt-transport-https gnupg lsb-release
+        wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+        echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | sudo tee /etc/apt/sources.list.d/trivy.list
+        sudo apt-get update -y
+        sudo apt-get install -y trivy
 
     - name: Trivy FS Scan
       run: trivy fs --format table -o fs-report.txt .
 
     - name: Gitleaks Installation
       run: |
-        if ! command -v gitleaks >/dev/null 2>&1; then
-          wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
-          tar -xzf gitleaks_8.18.4_linux_x64.tar.gz gitleaks
-          sudo mv gitleaks /usr/local/bin/gitleaks
-          rm -f gitleaks_8.18.4_linux_x64.tar.gz
-        fi
+        wget -q https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz
+        tar -xzf gitleaks_8.18.4_linux_x64.tar.gz gitleaks
+        sudo mv gitleaks /usr/local/bin/gitleaks
 
     - name: Gitleaks Code Scan
       run: gitleaks detect --source . -r gitleaks-report.json -f json
@@ -63,7 +58,7 @@ jobs:
         if-no-files-found: ignore
 
   test:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: security-check
     steps:
     - uses: actions/checkout@v4
@@ -77,12 +72,11 @@ jobs:
       run: mvn --batch-mode test
 
   build_project_and_sonar_scan:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: test
     steps:
     - uses: actions/checkout@v4
       with:
-        # Full history gives Sonar more accurate reporting
         fetch-depth: 0
 
     - name: Set up JDK 17
@@ -106,16 +100,15 @@ jobs:
         SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
       run: |
         if [ -z "$SONAR_HOST_URL" ]; then
-          echo "ERROR: SONAR_HOST_URL is empty. Create it under Settings > Secrets and variables > Actions > *Variables*."
+          echo "ERROR: SONAR_HOST_URL is empty. Create it under Settings > Secrets and variables > Actions > Variables."
           exit 1
         fi
         URL="${SONAR_HOST_URL%/}"
         echo "Testing $URL/api/system/status ..."
         if ! curl -sS --max-time 15 "$URL/api/system/status"; then
           echo ""
-          echo "ERROR: Runner cannot reach SonarQube."
-          echo "- Same machine as runner? Use http://localhost:9000 or the private IP."
-          echo "- Different machine? Open port 9000 in its security group/firewall for the runner."
+          echo "ERROR: GitHub-hosted runner cannot reach SonarQube."
+          echo "Use a PUBLIC URL (public IP/domain, port 9000 open) or SonarCloud."
           exit 1
         fi
         echo ""
@@ -140,7 +133,7 @@ jobs:
         SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
 
   build_docker_image_and_push:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: build_project_and_sonar_scan
     steps:
     - uses: actions/checkout@v4
@@ -174,20 +167,13 @@ jobs:
         file: ./Dockerfile
 
   deploy_to_kubernetes:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     needs: build_docker_image_and_push
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Install AWS CLI
-      run: |
-        if ! command -v aws >/dev/null 2>&1; then
-          curl -sS "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip -q -o awscliv2.zip
-          sudo ./aws/install --update
-        fi
-
+    # AWS CLI is preinstalled on ubuntu-latest, so no install step is needed
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -209,4 +195,4 @@ jobs:
         chmod 600 $HOME/.kube/config
 
     - name: Deploy to EKS
-      run:
+      run: kubectl apply -f ds.yml
